@@ -3,25 +3,33 @@ from pydub import AudioSegment
 import io
 import os
 
-# Asegurar que Pydub use ffmpeg en Streamlit Cloud
+# Ruta de ffmpeg en Streamlit Cloud
 AudioSegment.converter = "/usr/bin/ffmpeg"
 
 st.set_page_config(page_title="Mejora de Audios WhatsApp", layout="centered")
 st.title("🎙️ Mejora de Audios a Calidad de Estudio")
 
-st.write("Sube varios audios (por ejemplo, grabaciones de WhatsApp) y los convertiremos automáticamente a calidad mejorada.")
+st.write("Sube varios audios y los convertiremos automáticamente a calidad mejorada.")
 
-# Función para mejorar audio
+# Función para mejorar audio usando ffmpeg
 def mejorar_audio(file_bytes, formato_original):
+    # Cargar audio original
     audio = AudioSegment.from_file(io.BytesIO(file_bytes), format=formato_original)
-    audio = audio.set_frame_rate(44100) \
-                 .set_channels(2) \
-                 .normalize()
+    
+    # Exportar a WAV con parámetros de calidad usando ffmpeg
+    temp_wav = io.BytesIO()
+    audio.export(temp_wav, format="wav", parameters=["-ar", "44100", "-ac", "2"])
+    temp_wav.seek(0)
+    
+    # Volver a cargar y normalizar
+    audio_mejorado = AudioSegment.from_wav(temp_wav).normalize()
+    
+    # Exportar a MP3 de alta calidad
     output_bytes = io.BytesIO()
-    audio.export(output_bytes, format="mp3", bitrate="192k")
+    audio_mejorado.export(output_bytes, format="mp3", bitrate="192k")
     return output_bytes.getvalue()
 
-# Subida de múltiples archivos
+# Subida múltiple
 archivos = st.file_uploader("Selecciona tus audios", type=["mp3", "wav", "ogg", "m4a"], accept_multiple_files=True)
 
 if archivos:
