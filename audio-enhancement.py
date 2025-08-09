@@ -1,7 +1,6 @@
-# streamlit_app.py
 import streamlit as st
-import tempfile, os, io, zipfile, subprocess, time
-from audio_processor import process_file_to_polished
+import tempfile, os, io, zipfile, subprocess, time, shutil
+from audio_processor import process_file_to_polished, rnnoise_available
 from pathlib import Path
 
 st.set_page_config(page_title="Mejora Agresiva - Voz Locutor", layout="wide")
@@ -9,10 +8,47 @@ st.title("🎙️ Mejora Agresiva — Voz estilo locutor")
 
 st.markdown("""
 Sube varios audios (wav/mp3/ogg/opus/m4a).  
-Pipeline: **denoise (noisereduce)** → **polish FFmpeg (HP/LP/EQ/Comp/afftdn/loudnorm)** → export WAV/MP3.  
+Pipeline: **denoise (noisereduce/RNNoise)** → **polish FFmpeg (HP/LP/EQ/Comp/afftdn/loudnorm)** → export WAV/MP3.  
 Si algún filtro FFmpeg falla, se aplica un fallback compatible.
 """)
 
+# --- Dependency Checks at Startup ---
+
+def check_ffmpeg_filters(required_filters):
+    """Returns a list of missing filters from ffmpeg -filters output."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-filters"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
+        )
+        available = result.stdout.lower()
+        missing = [f for f in required_filters if f not in available]
+        return missing
+    except Exception as e:
+        return required_filters  # Assume all missing if ffmpeg call fails
+
+def show_dependency_warnings():
+    ffmpeg_missing = shutil.which("ffmpeg") is None
+    rnnoise_missing = not rnnoise_available()
+    required_filters = ["afftdn", "loudnorm", "highpass", "lowpass", "equalizer", "acompressor"]
+    filters_missing = check_ffmpeg_filters(required_filters) if not ffmpeg_missing else required_filters
+
+    if ffmpeg_missing:
+        st.error("⚠️ **No se detectó FFmpeg en el sistema.** Por favor instala FFmpeg y asegúrate que esté en tu PATH.")
+    elif filters_missing:
+        st.warning(
+            f"⚠️ FFmpeg está instalado pero faltan los siguientes filtros: `{', '.join(filters_missing)}`. "
+            "Algunas funciones pueden no estar disponibles. Busca un build completo de FFmpeg."
+        )
+    if rnnoise_missing:
+        st.info(
+            "🔈 **RNNoise no encontrado:** Para mejor reducción de ruido, coloca el binario en `utils/rnnoise/` "
+            "o instálalo globalmente. Consulta el README para más detalles."
+        )
+
+show_dependency_warnings()
+
+# --- UI Controls ---
 st.sidebar.header("Ajustes")
 output_format = st.sidebar.selectbox("Formato final", ["wav", "mp3"])
 mp3_bitrate = st.sidebar.selectbox("Bitrate mp3", ["192k", "256k", "320k"])
