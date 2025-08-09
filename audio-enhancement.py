@@ -1,34 +1,68 @@
 import streamlit as st
 from pydub import AudioSegment
-import io, zipfile
-from utils import mejorar_audio
+import io
+import numpy as np
+from scipy.signal import resample
+import tempfile
+import os
 
-AudioSegment.converter = "/usr/bin/ffmpeg"
+# Función para mejorar audio sin usar audioop
+def mejorar_audio_con_numpy(audio_bytes, formato):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{formato}") as temp_in:
+        temp_in.write(audio_bytes)
+        temp_in_path = temp_in.name
 
-st.title("🎙️ Mejora de Audios de WhatsApp a Calidad de Estudio")
-st.write("Sube uno o varios archivos de audio y conviértelos automáticamente a mejor calidad.")
+    # Abrir con pydub
+    audio = AudioSegment.from_file(temp_in_path, format=formato)
 
-archivos = st.file_uploader("Selecciona los audios", type=["mp3", "wav", "ogg", "opus", "m4a"], accept_multiple_files=True)
+    # Convertir a numpy array
+    samples = np.array(audio.get_array_of_samples()).astype(np.float32)
+
+    # Normalizar a -1.0 / 1.0
+    samples /= np.iinfo(audio.array_type).max
+
+    # Re-muestrear a 44.1 kHz (sin audioop)
+    target_rate = 44100
+    num_samples = int(len(samples) * target_rate / audio.frame_rate)
+    samples_resampled = resample(samples, num_samples)
+
+    # Volver a escalar y convertir
+    samples_resampled = np.int16(samples_resampled / np.max(np.abs(samples_resampled)) * 32767)
+
+    # Crear nuevo AudioSegment desde numpy
+    audio_mejorado = AudioSegment(
+        samples_resampled.tobytes(),
+        frame_rate=target_rate,
+        sample_width=2,
+        channels=audio.channels
+    )
+
+    os.remove(temp_in_path)  # Limpiar archivo temporal
+    return audio_mejorado
+
+# Interfaz Streamlit
+st.title("🎙️ Mejora de Audios de WhatsApp")
+st.write("Sube tus audios y conviértelos automáticamente a calidad cercana a estudio.")
+
+archivos = st.file_uploader("Selecciona uno o varios archivos de audio", type=["mp3", "wav", "ogg", "opus", "m4a"], accept_multiple_files=True)
 
 if archivos:
-    memoria_zip = io.BytesIO()
+    for archivo in archivos:
+        formato = archivo.name.split(".")[-1].lower()
+        try:
+            mejorado = mejorar_audio_con_numpy(archivo.read(), formato)
 
-    with zipfile.ZipFile(memoria_zip, mode="w") as zf:
-        for archivo in archivos:
-            try:
-                formato = archivo.name.split(".")[-1]
-                mejorado = mejorar_audio(archivo, formato)
+            # Guardar con mismo nombre pero .wav
+            nombre_salida = os.path.splitext(archivo.name)[0] + "_mejorado.wav"
+            buffer_salida = io.BytesIO()
+            mejorado.export(buffer_salida, format="wav")
+            buffer_salida.seek(0)
 
-                salida = io.BytesIO()
-                mejorado.export(salida, format="mp3")
-                salida.seek(0)
-
-                # Guardar con el mismo nombre original pero en mp3
-                nuevo_nombre = ".".join(archivo.name.split(".")[:-1]) + ".mp3"
-                zf.writestr(nuevo_nombre, salida.read())
-
-            except Exception as e:
-                st.error(f"Error procesando {archivo.name}: {e}")
-
-    memoria_zip.seek(0)
-    st.download_button("⬇️ Descargar audios mejorados", memoria_zip, "audios_mejorados.zip", "application/zip")
+            st.download_button(
+                label=f"⬇️ Descargar {nombre_salida}",
+                data=buffer_salida,
+                file_name=nombre_salida,
+                mime="audio/wav"
+            )
+        except Exception as e:
+            st.error(f"Error procesando {archivo.name}: {e}")
