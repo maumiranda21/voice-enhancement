@@ -3,7 +3,7 @@ import os
 import librosa
 import soundfile as sf
 import numpy as np
-from deepfilter import enhance, init_df
+from deep_filter import enhance, init_df
 import zipfile
 import io
 from datetime import datetime
