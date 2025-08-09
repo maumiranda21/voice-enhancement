@@ -11,6 +11,7 @@ Si no encuentras binarios para tu plataforma, en README indico cómo compilar o 
 import shutil
 import subprocess
 from pathlib import Path
+import os
 
 RNNOISE_BINARIES = [
     Path("utils/rnnoise/rnnoise_demo"),   # ejemplo nombre común
