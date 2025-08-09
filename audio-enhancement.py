@@ -1,62 +1,58 @@
 import streamlit as st
-from pydub import AudioSegment
-import io
+import soundfile as sf
 import numpy as np
 from scipy.signal import resample
-import tempfile
+import io
 import os
+import tempfile
 
-# Función para mejorar audio sin usar audioop
-def mejorar_audio_con_numpy(audio_bytes, formato):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{formato}") as temp_in:
+def mejorar_audio_numpy(audio_bytes):
+    with tempfile.NamedTemporaryFile(delete=False) as temp_in:
         temp_in.write(audio_bytes)
         temp_in_path = temp_in.name
 
-    # Abrir con pydub
-    audio = AudioSegment.from_file(temp_in_path, format=formato)
+    # Leer audio original
+    data, samplerate = sf.read(temp_in_path, dtype="float32")
 
-    # Convertir a numpy array
-    samples = np.array(audio.get_array_of_samples()).astype(np.float32)
+    # Normalizar amplitud
+    data = data / np.max(np.abs(data))
 
-    # Normalizar a -1.0 / 1.0
-    samples /= np.iinfo(audio.array_type).max
+    # Convertir a estéreo si es mono
+    if len(data.shape) == 1:
+        data = np.stack((data, data), axis=1)
 
-    # Re-muestrear a 44.1 kHz (sin audioop)
+    # Re-muestrear a 44.1 kHz
     target_rate = 44100
-    num_samples = int(len(samples) * target_rate / audio.frame_rate)
-    samples_resampled = resample(samples, num_samples)
+    num_samples = int(len(data) * target_rate / samplerate)
+    data_resampled = resample(data, num_samples)
 
-    # Volver a escalar y convertir
-    samples_resampled = np.int16(samples_resampled / np.max(np.abs(samples_resampled)) * 32767)
+    # Aumentar volumen un poco
+    data_resampled = np.clip(data_resampled * 1.2, -1.0, 1.0)
 
-    # Crear nuevo AudioSegment desde numpy
-    audio_mejorado = AudioSegment(
-        samples_resampled.tobytes(),
-        frame_rate=target_rate,
-        sample_width=2,
-        channels=audio.channels
-    )
-
-    os.remove(temp_in_path)  # Limpiar archivo temporal
-    return audio_mejorado
+    os.remove(temp_in_path)
+    return data_resampled, target_rate
 
 # Interfaz Streamlit
 st.title("🎙️ Mejora de Audios de WhatsApp")
-st.write("Sube tus audios y conviértelos automáticamente a calidad cercana a estudio.")
+st.write("Sube tus audios y conviértelos a mejor calidad.")
 
-archivos = st.file_uploader("Selecciona uno o varios archivos de audio", type=["mp3", "wav", "ogg", "opus", "m4a"], accept_multiple_files=True)
+archivos = st.file_uploader(
+    "Selecciona uno o varios archivos de audio",
+    type=["mp3", "wav", "ogg", "opus", "m4a"],
+    accept_multiple_files=True
+)
 
 if archivos:
     for archivo in archivos:
-        formato = archivo.name.split(".")[-1].lower()
         try:
-            mejorado = mejorar_audio_con_numpy(archivo.read(), formato)
+            mejorado, rate = mejorar_audio_numpy(archivo.read())
 
-            # Guardar con mismo nombre pero .wav
-            nombre_salida = os.path.splitext(archivo.name)[0] + "_mejorado.wav"
+            # Guardar en buffer como WAV
             buffer_salida = io.BytesIO()
-            mejorado.export(buffer_salida, format="wav")
+            sf.write(buffer_salida, mejorado, rate, format='WAV')
             buffer_salida.seek(0)
+
+            nombre_salida = os.path.splitext(archivo.name)[0] + "_mejorado.wav"
 
             st.download_button(
                 label=f"⬇️ Descargar {nombre_salida}",
