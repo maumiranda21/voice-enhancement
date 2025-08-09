@@ -1,23 +1,22 @@
-# Mejorador de Audio con IA
-
+Mejorador de Audio con IA
 Una aplicación Streamlit que mejora la calidad de archivos de audio (como los recibidos por WhatsApp) utilizando DeepFilterNet3 para supresión de ruido y mejora de voz, logrando un sonido con calidad de estudio. Permite procesar múltiples archivos de audio en lote y descargar los resultados.
+Características
 
-## Características
-- Subida de múltiples archivos de audio (MP3, WAV, OGG, FLAC, M4A).
-- Procesamiento automático con IA para eliminar ruido y mejorar la claridad.
-- Vista previa de audios originales y mejorados con formas de onda.
-- Descarga de audios mejorados individualmente o en un archivo ZIP.
-- Interfaz web sencilla con Streamlit.
+Subida de múltiples archivos de audio (MP3, WAV, OGG, FLAC, M4A).
+Procesamiento automático con IA para eliminar ruido y mejorar la claridad.
+Vista previa de audios originales y mejorados con formas de onda.
+Descarga de audios mejorados individualmente o en un archivo ZIP.
+Interfaz web sencilla con Streamlit.
 
-## Requisitos
-- Python 3.8+
-- Dependencias listadas en `requirements.txt`
+Requisitos
 
-## Instalación
-1. Clona el repositorio:
-   ```bash
-   git clone https://github.com/<tu-usuario>/voice-enhancement.git
-   cd voice-enhancement
+Python 3.8+
+Dependencias listadas en requirements.txt
+
+Instalación
+
+Clona el repositorio:git clone https://github.com/<tu-usuario>/voice-enhancement.git
+cd voice-enhancement
 
 
 Crea un entorno virtual (opcional, pero recomendado):python -m venv venv
@@ -67,4 +66,4 @@ DeepFilterNet3 requiere una instalación inicial que puede descargar modelos pre
 Para formatos de audio específicos, asegúrate de tener los códecs necesarios instalados (por ejemplo, FFmpeg para M4A).
 
 Licencia
-MIT License```
+MIT License
