@@ -1,0 +1,8 @@
+
+streamlit>=1.12
+numpy
+scipy
+librosa
+soundfile
+pydub
+noisereduce
